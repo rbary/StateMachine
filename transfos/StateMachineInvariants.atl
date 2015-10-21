@@ -1,51 +1,86 @@
 module StateMachineFirstExe;
-create result : MM from model : MM;
+create result: MM from model: MM;
 
 -- ******************************---
 -- HELPERS IMPL OCL CONSTRAINTS	 ---
 -- ******************************---
 
 -- For each model, there is a unicity of a StateMachine instanciation being ---
--- the starting to the creation and optimization of all the states and transitions of the model --
-helper context MM!StateMachine def: stateMachineUnicity() :Boolean =
-	self.allInstances() -> select (s | s.oclIsTypeOf(MM!StateMachine)) -> size() = 1
-;
+-- the starting to the creation and optimization of all the states and transitions of the
+		-- model --
+helper context MM!StateMachine def: stateMachineUnicity(): Boolean =
+	self.allInstances() -> select(s | s.oclIsTypeOf(MM!StateMachine)) -> size() = 1;
 
 -- The state referenced by an initial state of a composite is a state of the composite --
-helper context MM!CompositeState def: refInitStateBelongComposite  :Boolean =
-	self.states() -> include(self.initialState.referencedState)
-;
-
+helper context MM!CompositeState def: refInitStateBelongComposite: Boolean =
+	self.states() -> include(self.initialState.referencedState);
 
 -- Wether a StateMachine is active then it contains a only one active state and if --
 -- this state is Composite it contains a only one active state and so on           --
 helper context MM!StateMachine def: activeStateRecursion(): Boolean =
-	self.isActive and self.activeSubTree()
-;
+	self.isActive and self.activeSubTree();
 
 helper context MM!CompositeState def: activeSub(): Boolean =
-	self.states -> select (s | s.isActive ) -> size() = 1 and 
-	self.states -> select (s | s.oclIsTypeOf(MM!CompositeState)) -> forAll ( s|
-		if s.isActive then
+	self.states -> select(s | s.isActive) -> size() = 1 and self.states -> select(s | s.
+			oclIsTypeOf(MM!CompositeState)) -> forAll(s | if s.isActive then
 			s.activeSub()
 		else
 			s.unactiveSub()
-		endif
-	)
-;
+		endif);
 
 helper context MM!CompositeState def: unactiveSub(): Boolean =
-	self.states -> forAll (s | not s.isActive) and 
-	self.states -> select (s | s.oclIsTypeOf(MM!CompositeState)) -> forAll (s | s.unactiveSub)
-;
+	self.states -> forAll(s | not s.isActive) and self.states -> select(s | s.
+			oclIsTypeOf(MM!CompositeState)) -> forAll(s | s.unactiveSub);
 
+-- There are no two states having the same name within a composite --
+helper context MM!CompositeState def: stateDiscreetName(): Boolean =
+	self.states -> forAll(s0 | self.states -> forAll(s1 | s0.name = s1.name implies s0 =
+			s1));
 
 -- ******************************---
 --            RULES				 ---
 -- ******************************---
-	
+---------- STATEMACHINE ----------
+rule duplicateStateMachine {
+	from
+		src_sm: MM!StateMachine (
+			src_sm.stateMachineUnicity() and src_sm.activeStateRecursion()
+		)
+	to
+		tgt_sm: MM!StateMachine (
+			name <- src_sm.name,
+			container <- src_sm.container,
+			isActive <- src_sm.isActive,
+			operation <- src_sm.operation,
+			states <- src_sm.states,
+			initialState <- src_sm.initialState,
+			transitions <- src_sm.transitions,
+			events <- src_sm.events,
+			variables <- src_sm.variables
+		)
+}
+
+rule NotduplicateStateMachine {
+	from
+		source_sm: MM!StateMachine (
+			not(source_sm.stateMachineUnicity() and source_sm.activeStateRecursion())
+		)
+	to
+		target_sm: MM!StateMachine (
+			name <- source_sm.name,
+			container <- source_sm.container,
+			isActive <- source_sm.isActive,
+			operation <- source_sm.operation,
+			states <- source_sm.states,
+			initialState <- source_sm.initialState,
+			transitions <- source_sm.transitions,
+			events <- source_sm.events,
+			variables <- source_sm.variables
+		),
+		error : target_sm!ConstraintError (
+			description <- 'There is more than one StateMachine in the model or There is no active state recursion from a StateMachine',
+			element <- target_sm
+		)
+}
 
 
-
-
-	
