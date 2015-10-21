@@ -1,0 +1,51 @@
+module StateMachineFirstExe;
+create result : MM from model : MM;
+
+-- ******************************---
+-- HELPERS IMPL OCL CONSTRAINTS	 ---
+-- ******************************---
+
+-- For each model, there is a unicity of a StateMachine instanciation being ---
+-- the starting to the creation and optimization of all the states and transitions of the model --
+helper context MM!StateMachine def: stateMachineUnicity() :Boolean =
+	self.allInstances() -> select (s | s.oclIsTypeOf(MM!StateMachine)) -> size() = 1
+;
+
+-- The state referenced by an initial state of a composite is a state of the composite --
+helper context MM!CompositeState def: refInitStateBelongComposite  :Boolean =
+	self.states() -> include(self.initialState.referencedState)
+;
+
+
+-- Wether a StateMachine is active then it contains a only one active state and if --
+-- this state is Composite it contains a only one active state and so on           --
+helper context MM!StateMachine def: activeStateRecursion(): Boolean =
+	self.isActive and self.activeSubTree()
+;
+
+helper context MM!CompositeState def: activeSub(): Boolean =
+	self.states -> select (s | s.isActive ) -> size() = 1 and 
+	self.states -> select (s | s.oclIsTypeOf(MM!CompositeState)) -> forAll ( s|
+		if s.isActive then
+			s.activeSub()
+		else
+			s.unactiveSub()
+		endif
+	)
+;
+
+helper context MM!CompositeState def: unactiveSub(): Boolean =
+	self.states -> forAll (s | not s.isActive) and 
+	self.states -> select (s | s.oclIsTypeOf(MM!CompositeState)) -> forAll (s | s.unactiveSub)
+;
+
+
+-- ******************************---
+--            RULES				 ---
+-- ******************************---
+	
+
+
+
+
+	
