@@ -1,7 +1,6 @@
 module StateMachineDuplication;
 create result : MM from model : MM;
 
-
 ---------- STATEMACHINE ----------
 
 rule duplicateStateMachine { 
@@ -62,7 +61,7 @@ from
 to
 	 targetInitialState : MM!InitialState(
 	 	 referencedState <- sourceInitialState.referencedState
-	 )
+	 )	 
 } 
 
 

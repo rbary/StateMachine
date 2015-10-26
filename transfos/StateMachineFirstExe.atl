@@ -1,11 +1,237 @@
 module StateMachineFirstExe;
-create result : MM from model : MM;
+create result: SMTarget from model: SMSource;
 
 -- ******************************---
--- HELPERS						 ---
+-- 			HELPERS				 ---
 -- ******************************---
 
+-- Finding the initial state of the stateMachine --
+helper context SMSource!State def: isInitialState() : Boolean =
+	if (self.container.oclIsTypeOf(SMSource!StateMachine)) then
+		true
+	else 
+		false
+	endif
+;
 
+-- Finding the initial state of the stateMachine wether this one is a Composite state --
+
+	
 -- ******************************---
--- RULES						 ---
+-- 			 RULES	 			 ---
 -- ******************************---
+---------- STATEMACHINE ----------
+
+rule duplicateStateMachine { 
+from
+	 sourceStateMachine : SMSource!StateMachine
+to
+	 targetStateMachine : SMTarget!StateMachine(
+	 	 name <- sourceStateMachine.name,
+	 	 container <- sourceStateMachine.container,
+	 	 isActive <- sourceStateMachine.isActive,
+	 	 operation <- sourceStateMachine.operation,
+	 	 states <- sourceStateMachine.states,
+	 	 initialState <- sourceStateMachine.initialState,
+	 	 transitions <- sourceStateMachine.transitions,
+	 	 events <- sourceStateMachine.events,
+	 	 variables <- sourceStateMachine.variables
+	 )
+} 
+
+
+---------- STATE ----------
+rule duplicateState { 
+from
+	 sourceState : SMSource!State (
+	 	sourceState.oclIsTypeOf(SMSource!State)
+		and
+		sourceState.isInitialState()
+	 	)
+to
+	 targetState : SMTarget!State(
+	 	 name <- sourceState.name,
+	 	 container <- sourceState.container,
+	 	 isActive <- true,
+	 	 operation <- sourceState.operation
+	 )
+do{
+	 sourceState.debug('Initial state ='+targetState.name);
+	 sourceState.debug(targetState.isActive);
+  }
+}
+
+rule duplicateStatePrime { 
+from
+	 sourceState : SMSource!State (sourceState.oclIsTypeOf(SMSource!State)
+	 	and 
+		not(sourceState.isInitialState())
+	 )
+to
+	 targetState : SMTarget!State(
+	 	 name <- sourceState.name,
+	 	 container <- sourceState.container,
+	 	 isActive <- sourceState.isActive,
+	 	 operation <- sourceState.operation
+	 )
+}
+
+
+---------- COMPOSITESTATE ----------
+
+rule duplicateCompositeState { 
+from
+	 sourceCompositeState : SMSource!CompositeState (sourceCompositeState.oclIsTypeOf(SMSource!CompositeState))
+to
+	 targetCompositeState : SMTarget!CompositeState(
+	 	 name <- sourceCompositeState.name,
+	 	 container <- sourceCompositeState.container,
+	 	 isActive <- sourceCompositeState.isActive,
+	 	 operation <- sourceCompositeState.operation,
+	 	 states <- sourceCompositeState.states,
+	 	 initialState <- sourceCompositeState.initialState
+	 )
+} 
+
+
+---------- INITIALSTATE ----------
+
+rule duplicateInitialState { 
+from
+	 sourceInitialState : SMSource!InitialState
+to
+	 targetInitialState : SMTarget!InitialState(
+	 	 referencedState <- sourceInitialState.referencedState
+	 )
+} 
+
+
+---------- TRANSITION ----------
+
+rule duplicateTransition { 
+from
+	 sourceTransition : SMSource!Transition
+to
+	 targetTransition : SMTarget!Transition(
+	 	 source <- sourceTransition.source,
+	 	 target <- sourceTransition.target,
+	 	 event <- sourceTransition.event,
+	 	 guard <- sourceTransition.guard
+	 )
+} 
+
+
+---------- EVENT ----------
+
+rule duplicateEvent { 
+from
+	 sourceEvent : SMSource!Event
+to
+	 targetEvent : SMTarget!Event(
+	 	 name <- sourceEvent.name
+	 )
+} 
+
+
+---------- EXPRESSION ----------
+
+rule duplicateExpression { 
+from
+	 sourceExpression : SMSource!Expression
+to
+	 targetExpression : SMTarget!Expression(
+	 	 left <- sourceExpression.left,
+	 	 right <- sourceExpression.right,
+	 	 operator <- sourceExpression.operator,
+	 	 _name <- sourceExpression._name
+	 )
+} 
+
+
+---------- BOOLEANDATA ----------
+
+rule duplicateBooleanData { 
+from
+	 sourceBooleanData : SMSource!BooleanData
+to
+	 targetBooleanData : SMTarget!BooleanData(
+	 	 value <- sourceBooleanData.value
+	 )
+} 
+
+
+---------- INTEGERDATA ----------
+
+rule duplicateIntegerData { 
+from
+	 sourceIntegerData : SMSource!IntegerData
+to
+	 targetIntegerData : SMTarget!IntegerData(
+	 	 value <- sourceIntegerData.value
+	 )
+} 
+
+
+---------- BOOLEANVARIABLE ----------
+
+rule duplicateBooleanVariable { 
+from
+	 sourceBooleanVariable : SMSource!BooleanVariable
+to
+	 targetBooleanVariable : SMTarget!BooleanVariable(
+	 	 value <- sourceBooleanVariable.value,
+	 	 name <- sourceBooleanVariable.name
+	 )
+} 
+
+
+---------- INTEGERVARIABLE ----------
+
+rule duplicateIntegerVariable { 
+from
+	 sourceIntegerVariable : SMSource!IntegerVariable
+to
+	 targetIntegerVariable : SMTarget!IntegerVariable(
+	 	 value <- sourceIntegerVariable.value,
+	 	 name <- sourceIntegerVariable.name
+	 )
+} 
+
+
+---------- OPERATION ----------
+
+rule duplicateOperation { 
+from
+	 sourceOperation : SMSource!Operation
+to
+	 targetOperation : SMTarget!Operation(
+	 	 contents <- sourceOperation.contents
+	 )
+} 
+
+
+---------- ASSIGNMENT ----------
+
+rule duplicateAssignment { 
+from
+	 sourceAssignment : SMSource!Assignment
+to
+	 targetAssignment : SMTarget!Assignment(
+	 	 expression <- sourceAssignment.expression,
+	 	 variable <- sourceAssignment.variable,
+	 	 _name <- sourceAssignment._name
+	 )
+} 
+
+
+---------- VARIABLEREFERENCE ----------
+
+rule duplicateVariableReference { 
+from
+	 sourceVariableReference : SMSource!VariableReference
+to
+	 targetVariableReference : SMTarget!VariableReference(
+	 	 variable <- sourceVariableReference.variable,
+	 	 _name <- sourceVariableReference._name
+	 )
+} 

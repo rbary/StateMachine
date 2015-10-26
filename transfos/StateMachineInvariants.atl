@@ -1,5 +1,5 @@
-module StateMachineFirstExe;
-create result: MM from model: MM;
+module StateMachineInvariants;
+create result: SMTarget from model: SMSource;
 
 -- ******************************---
 -- HELPERS IMPL OCL CONSTRAINTS	 ---
@@ -8,289 +8,224 @@ create result: MM from model: MM;
 -- For each model, there is a unicity of a StateMachine instanciation being ---
 -- the starting to the creation and optimization of all the states and transitions of the
 		-- model --
-helper context MM!StateMachine def: stateMachineUnicity(): Boolean =
-	self.allInstances() -> select(s | s.oclIsTypeOf(MM!StateMachine)) -> size() = 1;
+helper context SMSource!StateMachine def: stateMachineUnicity(): Boolean =
+	SMSource!StateMachine.allInstances() -> select(s | s.
+			oclIsTypeOf(SMSource!StateMachine)) -> size() = 1;
 
 -- The state referenced by an initial state of a composite is a state of the composite --
-helper context MM!CompositeState def: refInitStateBelongComposite: Boolean =
-	self.states() -> include(self.initialState.referencedState);
+helper context SMSource!CompositeState def: initStateBelong(): Boolean =
+	--self.states -> includes(self.initialState);
+	-- to update
+	true;
 
 -- Wether a StateMachine is active then it contains a only one active state and if --
 -- this state is Composite it contains a only one active state and so on           --
-helper context MM!StateMachine def: activeStateRecursion(): Boolean =
-	self.isActive and self.activeSubTree();
+helper context SMSource!StateMachine def: activeStateRecursion(): Boolean =
+	-- self.isActive self.activeSubTree(); 
+	-- to update 
+	true;
 
-helper context MM!CompositeState def: activeSub(): Boolean =
-	self.states -> select(s | s.isActive) -> size() = 1 and self.states -> select(s | s.
-			oclIsTypeOf(MM!CompositeState)) -> forAll(s | if s.isActive then
-			s.activeSub()
+helper context SMSource!CompositeState def: activeSubTree(): Boolean =
+	self.states -> select(s | s.isActive) -> size() = 1 and 
+	self.states -> select(s | s.oclIsTypeOf(SMSource!CompositeState)) -> forAll(s | if s.isActive then
+			s.activeSubTree()
 		else
-			s.unactiveSub()
+			s.unactiveSubTree()
 		endif);
 
-helper context MM!CompositeState def: unactiveSub(): Boolean =
+helper context SMSource!CompositeState def: unactiveSubTree(): Boolean =
 	self.states -> forAll(s | not s.isActive) and self.states -> select(s | s.
-			oclIsTypeOf(MM!CompositeState)) -> forAll(s | s.unactiveSub);
+			oclIsTypeOf(SMSource!CompositeState)) -> forAll(s | s.unactiveSub);
 
 -- There are no two states having the same name within a composite --
-helper context MM!CompositeState def: stateDiscreetName(): Boolean =
-	self.states -> forAll(s0 | self.states -> forAll(s1 | s0.name = s1.name implies s0 =
-			s1));
+helper context SMSource!CompositeState def: stateDiscreetName(): Boolean =
+	self.states -> forAll(s0 | self.states -> forAll(s1 | s0.name = s1.name implies s0 = s1));
 
--- ******************************---
---            RULES				 ---
--- ******************************---
+
 ---------- STATEMACHINE ----------
 rule duplicateStateMachine {
 	from
-		source_statemachine: MM!StateMachine (
-			source_statemachine.stateMachineUnicity() and 
-			source_statemachine.activeStateRecursion()
+		sourceStateMachine: SMSource!StateMachine ( 
+			sourceStateMachine.stateMachineUnicity()
+			and 
+			sourceStateMachine.activeStateRecursion()	    
 		)
 	to
-		target_statemachine: MM!StateMachine (
-			name <- source_statemachine.name,
-			container <- source_statemachine.container,
-			isActive <- source_statemachine.isActive,
-			operation <- source_statemachine.operation,
-			states <- source_statemachine.states,
-			initialState <- source_statemachine.initialState,
-			transitions <- source_statemachine.transitions,
-			events <- source_statemachine.events,
-			variables <- source_statemachine.variables
+		targetStateMachine: SMTarget!StateMachine (
+			name <- sourceStateMachine.name,
+			container <- sourceStateMachine.container,
+			isActive <- sourceStateMachine.isActive,
+			operation <- sourceStateMachine.operation,
+			states <- sourceStateMachine.states,
+			initialState <- sourceStateMachine.initialState,
+			transitions <- sourceStateMachine.transitions,
+			events <- sourceStateMachine.events,
+			variables <- sourceStateMachine.variables
 		)
+	do{
+		sourceStateMachine.stateMachineUnicity().debug('*** state machine unicity ***');
+		sourceStateMachine.activeStateRecursion().debug('*** active state Recursion ***');
+	}
 }
 
-rule NotduplicateStateMachine {
+---------- STATE ----------
+rule duplicateState {
 	from
-		source_statemachine: MM!StateMachine (
-			not(source_statemachine.stateMachineUnicity() and 
-				source_statemachine.activeStateRecursion())
+		sourceState: SMSource!State (
+			sourceState.oclIsTypeOf(SMSource!State)
 		)
 	to
-		target_statemachine: MM!StateMachine (
-			name <- source_statemachine.name,
-			container <- source_statemachine.container,
-			isActive <- source_statemachine.isActive,
-			operation <- source_statemachine.operation,
-			states <- source_statemachine.states,
-			initialState <- source_statemachine.initialState,
-			transitions <- source_statemachine.transitions,
-			events <- source_statemachine.events,
-			variables <- source_statemachine.variables
-		),
-		error : target_statemachine!ConstraintError (
-			description <- 'There is more than one StateMachine in the model or There is no active state recursion from a StateMachine',
-			element <- target_statemachine
+		targetState: SMTarget!State (
+			name <- sourceState.name,
+			container <- sourceState.container,
+			isActive <- sourceState.isActive,
+			operation <- sourceState.operation
 		)
 }
 
------------ STATE ----------------
-rule duplicateState { 
-from
-	 source_state : MM!State (source_state.oclIsTypeOf(MM!State))
-to
-	 target_state : MM!State(
-	 	 name <- source_state.name,
-	 	 container <- source_state.container,
-	 	 isActive <- source_state.isActive,
-	 	 operation <- source_state.operation
-	 )
+---------- COMPOSITESTATE ----------
+rule duplicateCompositeState {
+	from
+		sourceCompositeState: SMSource!CompositeState (
+			sourceCompositeState.oclIsTypeOf(SMSource!CompositeState) 
+			and 
+			sourceCompositeState.initStateBelong()		
+			and 
+			sourceCompositeState.stateDiscreetName()
+			
+		)
+	to
+		targetCompositeState: SMTarget!CompositeState (
+			name <- sourceCompositeState.name,
+			container <- sourceCompositeState.container,
+			isActive <- sourceCompositeState.isActive,
+			operation <- sourceCompositeState.operation,
+			states <- sourceCompositeState.states,
+			initialState <- sourceCompositeState.initialState
+		)
+	do{
+		sourceCompositeState.initStateBelong().debug('*** Init state belong ***');
+		sourceCompositeState.stateDiscreetName().debug('*** State discreet name ***');
+	}
 }
-
----------- COMPOSITE_STATE -------------------
-rule duplicateCompositeState { 
-from
-	 source_compositestate : MM!CompositeState (
-	 					source_compositestate.oclIsTypeOf(MM!CompositeState) and
-						source_compositestate.refInitStateBelongComposite()
-					 )
-to
-	 target_compositeState : MM!CompositeState(
-	 	 name <- source_compositestate.name,
-	 	 container <- source_compositestate.container,
-	 	 isActive <- source_compositestate.isActive,
-	 	 operation <- source_compositestate.operation,
-	 	 states <- source_compositestate.states,
-	 	 initialState <- source_compositestate.initialState
-	 )
-}
-
-
-rule NotduplicateCompositeState { 
-from
-	 source_compositestate : MM!CompositeState (
-	 					not (	source_compositestate.oclIsTypeOf(MM!CompositeState) and
-	 							source_compositestate.refInitStateBelongComposite()	
-	 						 
-	 						)
-					 )
-to
-	 target_compositestate : MM!CompositeState(
-	 	 name <- source_compositestate.name,
-	 	 container <- source_compositestate.container,
-	 	 isActive <- source_compositestate.isActive,
-	 	 operation <- source_compositestate.operation,
-	 	 states <- source_compositestate.states,
-	 	 initialState <- source_compositestate.initialState
-	 ),
-	 error : target_compositestate!ConstraintError(
-	 	description <- 'The state referenced by an initial state of a composite is not a state of the current composite or the source type is not CompositeState',
-			 element <- target_compositestate
-	 )
-}
-
-
 
 ---------- INITIALSTATE ----------
-
-rule duplicateInitialState { 
-from
-	 sourceInitialState : MM!InitialState
-to
-	 targetInitialState : MM!InitialState(
-	 	 referencedState <- sourceInitialState.referencedState
-	 )
-} 
-
+rule duplicateInitialState {
+	from
+		sourceInitialState: SMSource!InitialState
+	to
+		targetInitialState: SMTarget!InitialState (
+			referencedState <- sourceInitialState.referencedState
+		)
+}
 
 ---------- TRANSITION ----------
-
-rule duplicateTransition { 
-from
-	 sourceTransition : MM!Transition
-to
-	 targetTransition : MM!Transition(
-	 	 source <- sourceTransition.source,
-	 	 target <- sourceTransition.target,
-	 	 event <- sourceTransition.event,
-	 	 guard <- sourceTransition.guard
-	 )
-} 
-
+rule duplicateTransition {
+	from
+		sourceTransition: SMSource!Transition
+	to
+		targetTransition: SMTarget!Transition (
+			source <- sourceTransition.source,
+			target <- sourceTransition.target,
+			event <- sourceTransition.event,
+			guard <- sourceTransition.guard
+		)
+}
 
 ---------- EVENT ----------
-
-rule duplicateEvent { 
-from
-	 sourceEvent : MM!Event
-to
-	 targetEvent : MM!Event(
-	 	 name <- sourceEvent.name
-	 )
-} 
-
+rule duplicateEvent {
+	from
+		sourceEvent: SMSource!Event
+	to
+		targetEvent: SMTarget!Event (
+			name <- sourceEvent.name
+		)
+}
 
 ---------- EXPRESSION ----------
-
-rule duplicateExpression { 
-from
-	 sourceExpression : MM!Expression
-to
-	 targetExpression : MM!Expression(
-	 	 left <- sourceExpression.left,
-	 	 right <- sourceExpression.right,
-	 	 operator <- sourceExpression.operator,
-	 	 _name <- sourceExpression._name
-	 )
-} 
-
+rule duplicateExpression {
+	from
+		sourceExpression: SMSource!Expression
+	to
+		targetExpression: SMTarget!Expression (
+			left <- sourceExpression.left,
+			right <- sourceExpression.right,
+			operator <- sourceExpression.operator,
+			_name <- sourceExpression._name
+		)
+}
 
 ---------- BOOLEANDATA ----------
-
-rule duplicateBooleanData { 
-from
-	 sourceBooleanData : MM!BooleanData
-to
-	 targetBooleanData : MM!BooleanData(
-	 	 value <- sourceBooleanData.value
-	 )
-} 
-
+rule duplicateBooleanData {
+	from
+		sourceBooleanData: SMSource!BooleanData
+	to
+		targetBooleanData: SMTarget!BooleanData (
+			value <- sourceBooleanData.value
+		)
+}
 
 ---------- INTEGERDATA ----------
-
-rule duplicateIntegerData { 
-from
-	 sourceIntegerData : MM!IntegerData
-to
-	 targetIntegerData : MM!IntegerData(
-	 	 value <- sourceIntegerData.value
-	 )
-} 
-
+rule duplicateIntegerData {
+	from
+		sourceIntegerData: SMSource!IntegerData
+	to
+		targetIntegerData: SMTarget!IntegerData (
+			value <- sourceIntegerData.value
+		)
+}
 
 ---------- BOOLEANVARIABLE ----------
-
-rule duplicateBooleanVariable { 
-from
-	 sourceBooleanVariable : MM!BooleanVariable
-to
-	 targetBooleanVariable : MM!BooleanVariable(
-	 	 value <- sourceBooleanVariable.value,
-	 	 name <- sourceBooleanVariable.name
-	 )
-} 
-
+rule duplicateBooleanVariable {
+	from
+		sourceBooleanVariable: SMSource!BooleanVariable
+	to
+		targetBooleanVariable: SMTarget!BooleanVariable (
+			value <- sourceBooleanVariable.value,
+			name <- sourceBooleanVariable.name
+		)
+}
 
 ---------- INTEGERVARIABLE ----------
-
-rule duplicateIntegerVariable { 
-from
-	 sourceIntegerVariable : MM!IntegerVariable
-to
-	 targetIntegerVariable : MM!IntegerVariable(
-	 	 value <- sourceIntegerVariable.value,
-	 	 name <- sourceIntegerVariable.name
-	 )
-} 
-
+rule duplicateIntegerVariable {
+	from
+		sourceIntegerVariable: SMSource!IntegerVariable
+	to
+		targetIntegerVariable: SMTarget!IntegerVariable (
+			value <- sourceIntegerVariable.value,
+			name <- sourceIntegerVariable.name
+		)
+}
 
 ---------- OPERATION ----------
-
-rule duplicateOperation { 
-from
-	 sourceOperation : MM!Operation
-to
-	 targetOperation : MM!Operation(
-	 	 contents <- sourceOperation.contents
-	 )
-} 
-
+rule duplicateOperation {
+	from
+		sourceOperation: SMSource!Operation
+	to
+		targetOperation: SMTarget!Operation (
+			contents <- sourceOperation.contents
+		)
+}
 
 ---------- ASSIGNMENT ----------
-
-rule duplicateAssignment { 
-from
-	 sourceAssignment : MM!Assignment
-to
-	 targetAssignment : MM!Assignment(
-	 	 expression <- sourceAssignment.expression,
-	 	 variable <- sourceAssignment.variable,
-	 	 _name <- sourceAssignment._name
-	 )
-} 
-
+rule duplicateAssignment {
+	from
+		sourceAssignment: SMSource!Assignment
+	to
+		targetAssignment: SMTarget!Assignment (
+			expression <- sourceAssignment.expression,
+			variable <- sourceAssignment.variable,
+			_name <- sourceAssignment._name
+		)
+}
 
 ---------- VARIABLEREFERENCE ----------
-
-rule duplicateVariableReference { 
-from
-	 sourceVariableReference : MM!VariableReference
-to
-	 targetVariableReference : MM!VariableReference(
-	 	 variable <- sourceVariableReference.variable,
-	 	 _name <- sourceVariableReference._name
-	 )
-} 
-
-
-
-
-
-
-
-
-
-
-
+rule duplicateVariableReference {
+	from
+		sourceVariableReference: SMSource!VariableReference
+	to
+		targetVariableReference: SMTarget!VariableReference (
+			variable <- sourceVariableReference.variable,
+			_name <- sourceVariableReference._name
+		)
+}
