@@ -1,22 +1,29 @@
 module StateMachineFirstExe;
 create result: SMTarget from model: SMSource;
 
--- ******************************---
--- 			HELPERS				 ---
--- ******************************---
+-- ****************************** ---
+-- 			HELPERS				  ---
+-- ****************************** ---
+helper context SMSource!State def : isInitialStateOfSM(container : MM!CompositeState, initialState : MM!InitialState, state : MM!State) : Boolean =
+if container.isActive = true and initialState.referencedState = state
+then 
+	true
+else 
+	false
+endif;
 
--- Finding the initial state of the stateMachine --
-helper context SMSource!State def: isInitialState() : Boolean =
-	if (self.container.oclIsTypeOf(SMSource!StateMachine)) then
-		true
-	else 
+helper context SMSource!State def : hasAOperation(): Boolean =
+	if self.operation.oclIsUndefined() then
 		false
+	else
+		true
 	endif
 ;
 
--- Finding the initial state of the stateMachine wether this one is a Composite state --
 
-	
+
+
+
 -- ******************************---
 -- 			 RULES	 			 ---
 -- ******************************---
@@ -43,35 +50,12 @@ to
 ---------- STATE ----------
 rule duplicateState { 
 from
-	 sourceState : SMSource!State (
-	 	sourceState.oclIsTypeOf(SMSource!State)
-		and
-		sourceState.isInitialState()
-	 	)
+	 sourceState : SMSource!State(sourceState.oclIsTypeOf(SMSource!State))
 to
 	 targetState : SMTarget!State(
 	 	 name <- sourceState.name,
 	 	 container <- sourceState.container,
-	 	 isActive <- true,
-	 	 operation <- sourceState.operation
-	 )
-do{
-	 sourceState.debug('Initial state ='+targetState.name);
-	 sourceState.debug(targetState.isActive);
-  }
-}
-
-rule duplicateStatePrime { 
-from
-	 sourceState : SMSource!State (sourceState.oclIsTypeOf(SMSource!State)
-	 	and 
-		not(sourceState.isInitialState())
-	 )
-to
-	 targetState : SMTarget!State(
-	 	 name <- sourceState.name,
-	 	 container <- sourceState.container,
-	 	 isActive <- sourceState.isActive,
+	 	 isActive <- sourceState.isInitialStateOfSM(sourceState.container, sourceState.container.initialState, sourceState),
 	 	 operation <- sourceState.operation
 	 )
 }
@@ -103,7 +87,7 @@ to
 	 targetInitialState : SMTarget!InitialState(
 	 	 referencedState <- sourceInitialState.referencedState
 	 )
-} 
+}
 
 
 ---------- TRANSITION ----------

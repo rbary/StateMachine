@@ -21,8 +21,6 @@ helper context SMSource!CompositeState def: initStateBelong(): Boolean =
 -- Wether a StateMachine is active then it contains a only one active state and if --
 -- this state is Composite it contains a only one active state and so on           --
 helper context SMSource!StateMachine def: activeStateRecursion(): Boolean =
-	-- self.isActive self.activeSubTree(); 
-	-- to update 
 	true;
 
 helper context SMSource!CompositeState def: activeSubTree(): Boolean =
