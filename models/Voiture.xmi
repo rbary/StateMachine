@@ -9,7 +9,7 @@
     <operation>
       <contents
           variable="//@variables.0"
-          _name="vitesse := 0">
+          _name="vitesse:=0">
         <expression
             xsi:type="SimplStateMachine:IntegerData"/>
       </contents>

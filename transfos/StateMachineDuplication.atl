@@ -35,7 +35,6 @@ to
 	 )
 } 
 
-
 ---------- COMPOSITESTATE ----------
 
 rule duplicateCompositeState { 

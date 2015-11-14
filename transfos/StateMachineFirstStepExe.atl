@@ -1,0 +1,420 @@
+module StateMachineFirstStepExe;
+
+create result : MM from model : MM;
+
+--------------------------
+------- Helpers ----------
+--------------------------
+helper context MM!State def : inputState() : Boolean =
+	if not(self.container.oclIsUndefined()) then
+		if	self.container.oclIsTypeOf(MM!StateMachine) 
+			and self.container.initialState.referencedState = self then
+				true
+		else
+			if self.container.oclIsTypeOf(MM!CompositeState) 
+			and self.container.initialState.referencedState = self then
+				self.container.inputState()
+			else
+				false
+			endif
+		endif
+	else
+		false
+	endif
+;
+
+helper context MM!CompositeState def : inputCompositeState() : Boolean =
+	if not(self.container.oclIsUndefined()) then
+		if self.container.oclIsTypeOf(MM!StateMachine)
+		   and self.container.initialState.referencedState = self then
+		   true
+		else
+		   false
+		endif
+	else
+		false
+	endif
+;
+
+helper context MM!IntegerVariable def : IntegerDataAdding() : Boolean =
+	self.value.oclIsUndefined()
+	and
+	MM!State.allInstances()->
+	select(state | state.inputState())
+	->first().operation.contents->exists(content | content.variable = self)
+;
+
+helper context MM!BooleanVariable def : BooleanDataAdding() : Boolean =
+	self.value.oclIsUndefined()
+	and
+	MM!State.allInstances()->
+	select(state | state.inputState())
+	->first().operation.contents->exists(content | content.variable = self) 
+	 
+;
+
+helper context MM!Assignment def : assignmentInputState() : Boolean =
+	MM!State.allInstances()->
+	select(state | state.inputState())
+	->first().operation.contents->exists(assign | assign._name = self._name)
+;
+
+helper def : helperInteger(integerdata : MM!IntegerData) : Integer = 
+	integerdata.value
+;
+	
+helper def : helperBoolean(booldata : MM!BooleanData) : Boolean = 
+	booldata.value
+;
+
+helper def : helperVarRef(var : MM!VariableReference) : OclAny =
+		MM!IntegerVariable.allInstances()->
+		select(int | int.name = var.variable.name)->first()
+;
+
+helper def : helperVarRefVal(var : MM!VariableReference) : OclAny =
+		MM!IntegerVariable.allInstances()->
+		select(int | int.name = var.variable.name)->first().value.value
+;
+
+
+helper def : helperExpressionOps(exp : MM!Expression) : Integer =
+	if exp.right.oclIsTypeOf(MM!IntegerVariable) then
+		exp.right.value.value
+	else
+		exp.right.value
+	endif
+;
+
+--------------------------
+-------- Rules -----------
+--------------------------
+rule duplicateStateMachine { 
+from
+	 sourceStateMachine : MM!StateMachine
+to
+	 targetStateMachine : MM!StateMachine(
+	 	 name <- sourceStateMachine.name,
+	 	 container <- sourceStateMachine.container,
+	 	 isActive <- true,
+	 	 operation <- sourceStateMachine.operation,
+	 	 states <- sourceStateMachine.states,
+	 	 initialState <- sourceStateMachine.initialState,
+	 	 transitions <- sourceStateMachine.transitions,
+	 	 events <- sourceStateMachine.events,
+	 	 variables <- sourceStateMachine.variables
+	 )
+} 
+
+
+---------- STATE ----------
+
+rule duplicateState_InputState { 
+from
+	 sourceState : MM!State (
+	 	sourceState.oclIsTypeOf(MM!State) 
+	 	and sourceState.inputState()
+		)
+to
+	 targetState : MM!State(
+	 	 name <- sourceState.name,
+	 	 container <- sourceState.container,
+	 	 isActive <- true,
+	 	 operation <- sourceState.operation
+	 )
+	 do{
+	 		targetState.debug('Activated State');
+	 }
+}
+
+rule duplicateState_NotInputState { 
+from
+	 sourceState : MM!State (sourceState.oclIsTypeOf(MM!State) 
+	 	and not(sourceState.inputState())
+	 )
+to
+	 targetState : MM!State(
+	 	 name <- sourceState.name,
+	 	 container <- sourceState.container,
+	 	 isActive <- false,
+	 	 operation <- sourceState.operation
+	 )
+	 	 do{
+	 		targetState.debug('State not to be active');
+	 	 }
+	 }
+
+---------- COMPOSITESTATE ----------
+
+rule duplicateComposite_InputCompositeState { 
+from
+	 sourceCompositeState : MM!CompositeState
+	 (sourceCompositeState.oclIsTypeOf(MM!CompositeState)
+	 	and sourceCompositeState.inputCompositeState()
+	 )
+to
+	 targetCompositeState : MM!CompositeState(
+	 	 name <- sourceCompositeState.name,
+	 	 container <- sourceCompositeState.container,
+	 	 isActive <- true,
+	 	 operation <- sourceCompositeState.operation,
+	 	 states <- sourceCompositeState.states,
+	 	 initialState <- sourceCompositeState.initialState
+	 )
+	 do{
+	 		targetCompositeState.debug('Activated composite state');
+	 }
+}
+
+rule duplicateCompositeState_NotInputCompositeState { 
+from
+	 sourceCompositeState : MM!CompositeState(
+	 	sourceCompositeState.oclIsTypeOf(MM!CompositeState)
+		and not(sourceCompositeState.inputCompositeState())
+	 )
+to
+	 targetCompositeState : MM!CompositeState(
+	 	 name <- sourceCompositeState.name,
+	 	 container <- sourceCompositeState.container,
+	 	 isActive <- false,
+	 	 operation <- sourceCompositeState.operation,
+	 	 states <- sourceCompositeState.states,
+	 	 initialState <- sourceCompositeState.initialState
+	 )
+	 do{
+	 		targetCompositeState.debug('Composite state not to be active');
+	 }
+} 
+
+---------- INITIALSTATE ----------
+
+rule duplicateInitialState { 
+from
+	 sourceInitialState : MM!InitialState
+to
+	 targetInitialState : MM!InitialState(
+	 	 referencedState <- sourceInitialState.referencedState
+	 )
+} 
+
+
+---------- TRANSITION ----------
+
+rule duplicateTransition { 
+from
+	 sourceTransition : MM!Transition
+to
+	 targetTransition : MM!Transition(
+	 	 source <- sourceTransition.source,
+	 	 target <- sourceTransition.target,
+	 	 event <- sourceTransition.event,
+	 	 guard <- sourceTransition.guard
+	 )
+} 
+
+
+---------- EVENT ----------
+
+rule duplicateEvent { 
+from
+	 sourceEvent : MM!Event
+to
+	 targetEvent : MM!Event(
+	 	 name <- sourceEvent.name
+	 )
+} 
+
+
+---------- EXPRESSION ----------
+
+rule duplicateExpression { 
+from
+	 sourceExpression : MM!Expression
+to
+	 targetExpression : MM!Expression(
+	 	 left <- sourceExpression.left,
+	 	 right <- sourceExpression.right,
+	 	 operator <- sourceExpression.operator,
+	 	 _name <- sourceExpression._name
+	 )
+} 
+
+
+---------- BOOLEANDATA ----------
+
+rule duplicateBooleanData { 
+from
+	 sourceBooleanData : MM!BooleanData
+to
+	 targetBooleanData : MM!BooleanData(
+	 	 value <- sourceBooleanData.value
+	 )
+} 
+
+
+---------- INTEGERDATA ----------
+
+rule duplicateIntegerData { 
+from
+	 sourceIntegerData : MM!IntegerData
+to
+	 targetIntegerData : MM!IntegerData(
+	 	 value <- sourceIntegerData.value
+	 )
+} 
+
+
+---------- BOOLEANVARIABLE ----------
+rule duplicateBooleanVariable_BooleanDataAdding { 
+from
+	 sourceBooleanVariable : MM!BooleanVariable
+	 (sourceBooleanVariable.BooleanDataAdding())
+to
+	 targetBooleanVariable : MM!BooleanVariable(
+	 	 value <- sourceBooleanVariable.value,
+	 	 name <- sourceBooleanVariable.name,
+		 value <- targetBooleanData
+	 ),
+	 targetBooleanData : MM!BooleanData(
+	 	value <- false
+	 )
+	 do{
+	 	targetBooleanVariable.name.debug('A BooleanData has been attributed to BooleanVariable');
+	 }
+} 
+
+rule duplicateBooleanVariable_NotBooleanDataAdding { 
+from
+	 sourceBooleanVariable : MM!BooleanVariable
+	 (not(sourceBooleanVariable.BooleanDataAdding()))
+to
+	 targetBooleanVariable : MM!BooleanVariable(
+	 	 value <- sourceBooleanVariable.value,
+	 	 name <- sourceBooleanVariable.name
+	 )
+} 
+
+
+---------- INTEGERVARIABLE ----------
+
+rule duplicateIntegerVariable_IntegerDataAdding { 
+from
+	 sourceIntegerVariable : MM!IntegerVariable
+	 (sourceIntegerVariable.IntegerDataAdding())
+to
+	 targetIntegerVariable : MM!IntegerVariable(
+	 	 value <- sourceIntegerVariable.value,
+	 	 name <- sourceIntegerVariable.name,
+		 value <- targetIntegerData
+	 ),
+	 targetIntegerData : MM!IntegerData(
+	 	value <- 0
+	 )
+	 do{
+	 	targetIntegerVariable.name.debug('An IntegerData has been attributed to IntegerVariable');
+	 }
+} 
+
+rule duplicateIntegerVariable_NotIntegerDataAdding { 
+from
+	 sourceIntegerVariable : MM!IntegerVariable 
+	 (not(sourceIntegerVariable.IntegerDataAdding()))
+to
+	 targetIntegerVariable : MM!IntegerVariable(
+	 	 value <- sourceIntegerVariable.value,
+	 	 name <- sourceIntegerVariable.name	
+	 )
+}
+
+---------- OPERATION ----------
+
+rule duplicateOperation { 
+from
+	 sourceOperation : MM!Operation
+to
+	 targetOperation : MM!Operation(
+	 	 contents <- sourceOperation.contents
+	 )
+}
+
+
+---------- ASSIGNMENT ----------
+
+rule duplicateAssignment_AssignmentInputState { 
+from
+	 sourceAssignment : MM!Assignment(sourceAssignment.assignmentInputState())
+to
+	 targetAssignment : MM!Assignment(
+ 	 expression <- sourceAssignment.expression,
+	 	 variable <- sourceAssignment.variable,
+	 	 _name <- sourceAssignment._name
+)
+do{
+	sourceAssignment._name.debug('Assignment relating to the input state');
+	if(sourceAssignment.expression.oclIsTypeOf(MM!IntegerData)){
+		targetAssignment.variable.value.value <- thisModule.helperInteger(sourceAssignment.expression);
+		sourceAssignment.expression.oclType().debug('expression Type to assign is');
+		targetAssignment.variable.value.value.debug('Value Assigned');
+	}
+	
+	if(sourceAssignment.expression.oclIsTypeOf(MM!BooleanData)){
+		targetAssignment.variable.value.value <- thisModule.helperBoolean(sourceAssignment.expression);
+		sourceAssignment.expression.oclType().debug('expression Type to assign is');
+	}
+	
+	if(sourceAssignment.expression.oclIsTypeOf(MM!Expression)){
+		if(sourceAssignment.expression.left.oclIsTypeOf(MM!VariableReference)){
+			if(sourceAssignment.expression.operator.name = 'add'){
+					thisModule.helperVarRef(sourceAssignment.expression.left).value.value <- 
+					thisModule.helperVarRefVal(sourceAssignment.expression.left) +
+					thisModule.helperExpressionOps(sourceAssignment.expression);	
+			}
+			
+			if(sourceAssignment.expression.operator.name = 'sub'){
+					thisModule.helperVarRef(sourceAssignment.expression.left).value.value <- 
+					thisModule.helperVarRefVal(sourceAssignment.expression.left) -
+					thisModule.helpExpressionOps(sourceAssignment.expression);	
+			}
+			
+			if(sourceAssignment.expression.operator.name = 'mul'){
+					thisModule.helperVarRef(sourceAssignment.expression.left).value.value <- 
+					thisModule.helperVarRefVal(sourceAssignment.expression.left)*
+					thisModule.helpExpressionOps(sourceAssignment.expression);	
+			}
+		
+			if(sourceAssignment.expression.operator.name = 'div'){
+					thisModule.helperVarRef(sourceAssignment.expression.left).value.value <- 
+					thisModule.helperVarRefVal(sourceAssignment.expression.left)/
+					thisModule.helpExpressionOps(sourceAssignment.expression);
+			}
+		}				
+		sourceAssignment.expression.debug('expression Type to assign is');
+	} 	
+	}
+} 
+
+rule duplicateAssignment_NotAssignmentInputState { 
+from
+	 sourceAssignment : MM!Assignment(not(sourceAssignment.assignmentInputState()))
+to
+	 targetAssignment : MM!Assignment(
+ 	 expression <- sourceAssignment.expression,
+	 	 variable <- sourceAssignment.variable,
+	 	 _name <- sourceAssignment._name
+)
+do{
+	sourceAssignment._name.debug('Assignment not relating to the input state');
+  }
+} 
+
+---------- VARIABLEREFERENCE ----------
+
+rule duplicateVariableReference { 
+from
+	 sourceVariableReference : MM!VariableReference
+to
+	 targetVariableReference : MM!VariableReference(
+	 	 variable <- sourceVariableReference.variable,
+	 	 _name <- sourceVariableReference._name
+	 )
+}

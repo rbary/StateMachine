@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="ISO-8859-1"?>
-<SimplStateMachine:StateMachine xmi:version="2.0" xmlns:xmi="http://www.omg.org/XMI" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:SimplStateMachine="platform:/resource/StateMachine/metaModels/StateMachine.ecore" name="Voiture">
-  <states name="Arret">
+<SimplStateMachine:StateMachine xmi:version="2.0" xmlns:xmi="http://www.omg.org/XMI" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:SimplStateMachine="platform:/resource/StateMachine/metaModels/StateMachine.ecore" name="Voiture" isActive="true">
+  <states name="Arret" isActive="true">
     <operation>
-      <contents variable="//@variables.0" _name="vitesse := 0">
+      <contents variable="//@variables.0" _name="vitesse:=0">
         <expression xsi:type="SimplStateMachine:IntegerData"/>
       </contents>
     </operation>
@@ -74,7 +74,9 @@
   </transitions>
   <events name="ralentir"/>
   <events name="accelerer"/>
-  <variables xsi:type="SimplStateMachine:IntegerVariable" name="vitesse"/>
+  <variables xsi:type="SimplStateMachine:IntegerVariable" name="vitesse">
+    <value xsi:type="SimplStateMachine:IntegerData"/>
+  </variables>
   <variables xsi:type="SimplStateMachine:BooleanVariable" name="maxAtteint">
     <value xsi:type="SimplStateMachine:BooleanData"/>
   </variables>
